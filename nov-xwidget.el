@@ -214,7 +214,7 @@ console.log(\"Hello world\");
 
 (defcustom nov-xwidget-browser-function 'nov-xwidget-webkit-browse-url-other-window
   "TODO: xwidget may not work in some systems, set it to an
-alternative browser function."
+alternative browser function. UPDATE: should return the buffer that shows the nov documents"
   :group 'nov-xwidget
   :type browse-url--browser-defcustom-type)
 
@@ -414,7 +414,9 @@ Interactively, URL defaults to the string looking like a url around point."
   (require 'xwidget)
   (when (stringp url)
     (if new-session
-        (xwidget-webkit-new-session url)
+        (progn
+          (xwidget-webkit-new-session url)
+          (xwidget-buffer (xwidget-webkit-current-session)))
       (progn
         (xwidget-webkit-goto-url url)
         (if switch-buffer-fun
@@ -422,31 +424,36 @@ Interactively, URL defaults to the string looking like a url around point."
           (pop-to-buffer (xwidget-buffer (xwidget-webkit-current-session))))))))
 
 (defun nov-xwidget-view ()
-  "View the current document in a xwidget webkit buffer."
+  "View the current document in a xwidget webkit buffer. UPDATE: save the raw nov buffer, for further use"
   (interactive)
   (let* ((docs nov-documents)
          (index nov-documents-index)
          (toc nov-toc-id)
          (epub nov-epub-version)
          (metadata nov-metadata)
-         (file (cdr (aref docs index))))
+         (file (cdr (aref docs index)))
+         (raw-buffer (current-buffer))
+         nov-view-buffer)
 
     ;; open the html file
-    (nov-xwidget-webkit-find-file file nil t)
+    (setq nov-view-buffer (nov-xwidget-webkit-find-file file nil t))
+    (message (format "nov-view-buffer: %s" nov-view-buffer))
+    (if (not nov-view-buffer)
+        (message "nov xwidget buffer is nil")
     ;; save nov related local variables
-    (when (eq nov-xwidget-browser-function 'nov-xwidget-webkit-browse-url-other-window)
-      (with-current-buffer (xwidget-buffer (xwidget-webkit-current-session))
+      (with-current-buffer nov-view-buffer
         ;;(setq-local imenu-create-index-function 'my-nov-imenu-create-index)
         (setq-local nov-documents docs)
         (setq-local nov-documents-index index)
         (setq-local nov-toc-id toc)
         (setq-local nov-epub-version epub)
-        (setq-local nov-metadata metadata))
+        (setq-local nov-metadata metadata)
+        (setq-local nov-raw-buffer raw-buffer))
       ;; save the file to `nox-xwidget-current-file', so that the header can parse
       (setq-local nov-xwidget-current-file file))))
 
 (defun nov-xwidget-next-document ()
-  "Go to the next document and render it."
+  "Go to the next document and render it. UPDATE: make nov buffer also go to the specific index"
   (interactive)
   (when (< nov-documents-index (1- (length nov-documents)))
     (let* ((docs nov-documents)
@@ -455,8 +462,9 @@ Interactively, URL defaults to the string looking like a url around point."
            (epub nov-epub-version)
            (metadata nov-metadata)
            (path (cdr (aref docs index))))
-      (nov-xwidget-webkit-find-file path)
-      (with-current-buffer (buffer-name)
+      (with-current-buffer nov-raw-buffer
+        (nov-goto-document index))
+      (with-current-buffer (nov-xwidget-webkit-find-file path)
         (setq-local nov-documents docs)
         (setq-local nov-documents-index index)
         (setq-local nov-toc-id toc)
@@ -464,7 +472,7 @@ Interactively, URL defaults to the string looking like a url around point."
         (setq-local nov-epub-version epub)))))
 
 (defun nov-xwidget-previous-document ()
-  "Go to the previous document and render it."
+  "Go to the previous document and render it. UPDATE: make nov buffer also go to the specific index"
   (interactive)
   (when (> nov-documents-index 0)
     (let* ((docs nov-documents)
@@ -473,10 +481,11 @@ Interactively, URL defaults to the string looking like a url around point."
            (epub nov-epub-version)
            (metadata nov-metadata)
            (path (cdr (aref docs index))))
+      (with-current-buffer nov-raw-buffer
+        (nov-goto-document index))
       (if (string-equal (file-name-extension path) "ncx")
           (nov-xwidget-goto-toc)
-        (nov-xwidget-webkit-find-file path)
-        (with-current-buffer (buffer-name)
+        (with-current-buffer (nov-xwidget-webkit-find-file path)
           (setq-local nov-documents docs)
           (setq-local nov-documents-index index)
           (setq-local nov-toc-id toc)
@@ -520,8 +529,7 @@ Interactively, URL defaults to the string looking like a url around point."
                  html-path)))
     (when (not index)
       (error "Couldn't locate TOC"))
-    (nov-xwidget-webkit-find-file file)
-    (with-current-buffer (buffer-name)
+    (with-current-buffer (nov-xwidget-webkit-find-file file)
       (setq-local nov-documents docs)
       (setq-local nov-documents-index index)
       (setq-local nov-toc-id toc)

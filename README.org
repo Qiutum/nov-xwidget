@@ -3,6 +3,12 @@
 #+SINCE:   <replace with next tagged release version>
 #+STARTUP: inlineimages nofold
 
+* Update
+
+- Add code to make eaf-browser can be used instead of the xwidget-webkit
+- Minor update:
+  - Make nov raw buffer change when nov-xwidget-next-document or nov-xwidget-previous document called
+
 * Introduction
 =nov-xwidget= extends [[https://depp.brause.cc/nov.el/][nov.el]] with the built-in xwidget webkit (You have to compile Emacs with
 xwidget support) and render the epub html/xhtml files with any customized CSS styles or
